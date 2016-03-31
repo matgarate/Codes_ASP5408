@@ -7,14 +7,15 @@ DataX=18	#In how many polls, "Desired_X people" picked the option 1?
 
 
 
-size=100
+size=1000
 r=np.linspace(0,1,num=size)
 dr=1.0/float(size)
 
 #P(X|r)= Binomial Distribution
 PX_r= binom.pmf(DataX,PersonNum,r)
 
-#Probability P(X) of finding DataX without assuming a value of r (This is the integration for the denominator in the Bayes Theorem)
+#Probability P(X) of finding DataX without assuming a value of r 
+#(This is the Riemann integration for the denominator in the Bayes Theorem)
 PX= np.sum(PX_r*dr)
 
 #P(r|x=18)
