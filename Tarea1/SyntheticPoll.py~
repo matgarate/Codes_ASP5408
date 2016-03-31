@@ -30,7 +30,7 @@ plt.plot(AnswerCount,Histogram[0],'bo-',label='Synthetic Distribution')
 plt.plot(AnswerCount,Binomial.pmf(AnswerCount),'ro-',label='Binomial PMF')
 plt.legend()
 
-print "In the "+str(round(Histogram[0][Desired_X]*100.0),1))+" % of the polls, "+ str(Desired_X)+" picked the option 1."
+print "In the "+str(Histogram[0][Desired_X]*100.0)+" % of the polls, "+ str(Desired_X)+" picked the option 1."
 
 
 plt.show()

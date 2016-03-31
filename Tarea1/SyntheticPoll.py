@@ -27,7 +27,7 @@ plt.xlim([0,33])
 
 AnswerCount=np.arange(PersonNum+1)
 plt.plot(AnswerCount,Histogram[0],'bo-',label='Synthetic Distribution')
-plt.plot(AnswerCount,Binomial.pmf(AnswerCount),'ro-',label='Binomial PMF')
+plt.plot(AnswerCount,Binomial.pmf(AnswerCount),'r--',label='Binomial PMF')
 plt.legend()
 
 print "In the "+str(Histogram[0][Desired_X]*100.0)+" % of the polls, "+ str(Desired_X)+" picked the option 1."
