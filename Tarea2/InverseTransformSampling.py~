@@ -16,7 +16,7 @@ for i in xrange(num):
 CDF_X=np.divide(CDF_X,float(num))
 
 
-plt.title('Random variables following: X=InvF(U)')
+plt.title('X random variables following: X=InvF(U)')
 plt.plot(x,NormCDF(x),'b',label='Normal Distribution CDF')
 plt.plot(x,CDF_X,'r',label='CDF of X ')
 plt.legend(loc=4)
