@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.stats import norm
-from scipy.stats import chisquare
+from scipy.stats import chi2 as chisquare
 from numpy import linalg
 from numpy import random
 from numpy.polynomial.polynomial import polyval
@@ -35,11 +35,19 @@ chi2_list=[]
 for P in range(0,11):
 	ParamAdjust= linalg.lstsq( CoeffMatrix(time,P+1),Sample.T)[0]	#Adjust P-degree poly to Samples
 	PolyAdjust= polyval(time,ParamAdjust)				#Generate Poly Adjust
-	chi2,pval= chisquare( Sample.T ,PolyAdjust.T)			#Chisquare foreach poly adjust.
+
+	residuals= (Sample-PolyAdjust)/sigma
+	chi2= np.sum(np.square(residuals),axis=1)
+	dof= N-P
+	red_chi2=chi2/float(dof)
+
+	
+	pval=chisquare.sf(chi2, dof)
+	#pval=1.0 - chisquare.cdf(red_chi2, 1)
 	chi2_list.append(np.average(chi2))
 
 	
-	Nbins=100
+	Nbins=20
 	Histogram=np.histogram(pval,range=(0.0,1.0),bins=Nbins)
 
 	plt.figure(1)

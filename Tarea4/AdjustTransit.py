@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.stats import norm
-from scipy.stats import chisquare
+from scipy.stats import chi2 as chisquare
 from numpy import linalg
 from numpy.polynomial.polynomial import polyval
 
@@ -49,20 +49,23 @@ print "Delta: " + str(delta)
 print "Poly Coefficients: " + str(b)
 
 
-chi2,p_value =chisquare(flux,model)
-print "Chi-square Test: " + str(chi2)
-print "p-value: "+ str(p_value)
+#chi2,p_value =chisquare(flux,model)
+#print "Chi-square Test: " + str(chi2)
+#print "p-value: "+ str(p_value)
 
 
-'''
+
 #chi2= np.sum(np.divide(np.square(model-flux),model))
 chi2= np.sum(np.square(residuals))
 print "Chi-square Test: " + str(chi2)
+dof= time.size-b.size-1
 
-#p_value = np.prod(2* (1.0-norm.cdf(np.fabs(residuals) ) ))
-p_value = np.average(2* (1.0-norm.cdf(np.fabs(residuals) ) ))
+#red_chi2=chi2/float(dof)
+#print "Chi-square Test: " + str(red_chi2)
+
+p_value=chisquare.sf(chi2, dof)
 print "p-value: "+ str(p_value)
-'''
+
 
 plt.xlabel('Time')
 plt.ylabel('Flux')
@@ -70,5 +73,3 @@ plt.plot(time,flux,'ro', label='Data')
 plt.plot(time,model,'b', label='Box+Poly Model')
 plt.legend()
 plt.show()
-
-
