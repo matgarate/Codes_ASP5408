@@ -16,15 +16,25 @@ def Discriminant_QDA(vector,Pi,mu,cov):
 	d=np.array(d)+np.log(Pi) -0.5*np.log(det_cov)
 	return d
 
+def CoeffMatrix(x,y,order):
+	n=x.size
+
+	if order==0:
+		M=[np.ones(n)]
+	if order==1:
+		M=[np.ones(n),x,y]
+	if order==2:
+		M=[np.ones(n),x,y,np.square(x),np.square(y),np.multiply(x,y)]
+	return np.array(M).T
 
 
-def LeastSquare(x,y,z,xr,yr):
-	n=z.size
-	N=yr.size
-	M=np.array([np.ones(n),x,y]).T
+def LeastSquare(x,y,z,xr,yr,order):
+	M=CoeffMatrix(x,y,order)
+
 	beta=linalg.lstsq(M,z)[0]
-	print "[B0,Bx,By] = "+ str(np.round(beta,2))
-	return np.dot(np.array([np.ones(N),xr,yr]).T,beta)
+	print "Params = "+ str(np.round(beta,2))
+	return np.dot(CoeffMatrix(xr,yr,order),beta)
+
 
 def LDA(x1,y1,x2,y2,xr,yr):
 	k=2

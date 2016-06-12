@@ -18,7 +18,7 @@ x2,y2= x[index_2],y[index_2]
 
 
 
-
+N=160
 def PlotContours(xr,yr,zr,title):
 	plt.title(title)	
 	i1=np.where(zr<1.5)[0]
@@ -29,6 +29,13 @@ def PlotContours(xr,yr,zr,title):
 	plt.plot(x1,y1,'ro')
 	plt.plot(x2,y2,'bo')
 
+	aux_x=xr.reshape(N,N)	
+	aux_y=yr.reshape(N,N)
+	zr[i1]=1.0
+	zr[i2]=2.0
+	aux_z=zr.reshape(N,N)
+	plt.contour(aux_x,aux_y,aux_z, 3,colors='k')
+
 
 
 
@@ -37,12 +44,12 @@ r=np.linspace(-4.0,12.0,num=N)
 xr, yr = np.meshgrid(r, r)
 xr=xr.flatten()
 yr=yr.flatten()
-z_lsq = LeastSquare(x,y,z,xr,yr)
+z_lsq = LeastSquare(x,y,z,xr,yr,1)
 z_lda = LDA(x1,y1,x2,y2,xr,yr)
 z_qda = QDA(x1,y1,x2,y2,xr,yr)
 
 plt.figure(1)
-PlotContours(xr,yr,z_lsq,"Least Squares")
+PlotContours(xr,yr,z_lsq,"Least Squares ")
 plt.figure(2)
 PlotContours(xr,yr,z_lda,"Linear Discriminant Analysis")
 plt.figure(3)
