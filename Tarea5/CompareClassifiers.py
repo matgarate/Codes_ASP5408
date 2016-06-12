@@ -1,9 +1,8 @@
 import numpy as np
-from numpy import linalg
-import scipy
 import matplotlib.pyplot as plt
 
 from Classifier_Methods import *
+from Classifier_MethodsExtra import *
 
 x,y,z= np.loadtxt("datos_clasificacion.dat",skiprows=1,unpack=True)
 n=z.size
@@ -14,7 +13,6 @@ index_2= np.where(z==2.0)[0]
 
 x1,y1= x[index_1],y[index_1]
 x2,y2= x[index_2],y[index_2]
-
 
 
 
@@ -44,16 +42,26 @@ r=np.linspace(-4.0,12.0,num=N)
 xr, yr = np.meshgrid(r, r)
 xr=xr.flatten()
 yr=yr.flatten()
+
+#Methods Parte a)
 z_lsq = LeastSquare(x,y,z,xr,yr,1)
+z_lsq_quad=LeastSquare(x,y,z,xr,yr,2)
 z_lda = LDA(x1,y1,x2,y2,xr,yr)
 z_qda = QDA(x1,y1,x2,y2,xr,yr)
 
 plt.figure(1)
-PlotContours(xr,yr,z_lsq,"Least Squares ")
+PlotContours(xr,yr,z_lsq,"Least Squares Order 1")
 plt.figure(2)
-PlotContours(xr,yr,z_lda,"Linear Discriminant Analysis")
+PlotContours(xr,yr,z_lsq_quad,"Least Squares Order 2")
 plt.figure(3)
+PlotContours(xr,yr,z_lda,"Linear Discriminant Analysis")
+plt.figure(4)
 PlotContours(xr,yr,z_qda,"Quadratic Discriminant Analysis")
+
+#Methods Parte b)
+
+
+#Methods Parte c)
 
 
 plt.show()

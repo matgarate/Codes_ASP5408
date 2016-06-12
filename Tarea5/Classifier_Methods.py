@@ -1,6 +1,5 @@
 import numpy as np
 from numpy import linalg
-import scipy
 
 def Discriminant_LDA(vector,Pi,mu,cov):
 	inv_cov= linalg.inv(cov)	
