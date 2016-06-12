@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 x,y,z= np.loadtxt("datos_clasificacion.dat",skiprows=1,unpack=True)
 n=z.size
 
-
 M=np.array([np.ones(n),x,y]).T
 
 
@@ -23,8 +22,9 @@ plt.plot(x[index_1],y[index_1],'ro')
 plt.plot(x[index_2],y[index_2],'bo')
 
 
+print "[B0,Bx,By] = "+ str(np.round(beta,2))
 
-N=160
+N=80
 r=np.linspace(-4.0,12.0,num=N)
 xr, yr = np.meshgrid(r, r)
 xr=xr.flatten()
