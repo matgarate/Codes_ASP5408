@@ -76,4 +76,3 @@ def QDA(x1,y1,x2,y2,xr,yr):
 	return zr
 
 
-

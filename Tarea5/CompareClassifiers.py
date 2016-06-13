@@ -32,9 +32,10 @@ def PlotContours(xr,yr,zr,title):
 	zr[i1]=1.0
 	zr[i2]=2.0
 	aux_z=zr.reshape(N,N)
-	plt.contour(aux_x,aux_y,aux_z, 3,colors='k')
+	plt.contour(aux_x,aux_y,aux_z, 1,colors='k',linewidths=3)
 
 
+	
 
 
 N=160
@@ -48,6 +49,18 @@ z_lsq = LeastSquare(x,y,z,xr,yr,1)
 z_lsq_quad=LeastSquare(x,y,z,xr,yr,2)
 z_lda = LDA(x1,y1,x2,y2,xr,yr)
 z_qda = QDA(x1,y1,x2,y2,xr,yr)
+
+
+Confussion_Score(z,LeastSquare(x,y,z,x,y,1) ,"LSQ")
+Confussion_Score(z,LeastSquare(x,y,z,x,y,2) ,"LSQ Quadratic")
+Confussion_Score(z,LDA(x1,y1,x2,y2,x,y) ,"LDA")
+Confussion_Score(z,QDA(x1,y1,x2,y2,x,y) ,"QDA")
+
+
+plt.figure(0)
+plt.title('Data')
+plt.plot(x1,y1,'ro')
+plt.plot(x2,y2,'bo')
 
 plt.figure(1)
 PlotContours(xr,yr,z_lsq,"Least Squares Order 1")
@@ -63,16 +76,29 @@ PlotContours(xr,yr,z_qda,"Quadratic Discriminant Analysis")
 z_k1=KNeigh(x,y,z,xr,yr,1)
 z_k15=KNeigh(x,y,z,xr,yr,15)
 
+z_lasso=LassoQuadratic(x,y,z,xr,yr)
+
+Confussion_Score(z,KNeigh(x,y,z,x,y,1) ,"NN-1")
+Confussion_Score(z,KNeigh(x,y,z,x,y,15) ,"NN-15")
+Confussion_Score(z,LassoQuadratic(x,y,z,x,y) ,"Quadratic Lasso")
+
+
 plt.figure(5)
 PlotContours(xr,yr,z_k1,"1 Nearest Neighbohr")
 
 plt.figure(6)
 PlotContours(xr,yr,z_k15,"15 Nearest Neighbohr")
 
-
+plt.figure(7)
+PlotContours(xr,yr,z_lasso,"Quadratic Lasso")
 
 
 #Methods Parte c)
+z_bayes=BayesClassifier(float(index_1.size)/float(n),float(index_2.size)/float(n),np.array([2,3]),np.array([6,6]),np.array([[5,-2],[-2,5]]),np.array([[1,0],[0,1]]),xr,yr)
+Confussion_Score(z,BayesClassifier(float(index_1.size)/float(n),float(index_2.size)/float(n),np.array([2,3]),np.array([6,6]),np.array([[5,-2],[-2,5]]),np.array([[1,0],[0,1]]),x,y) ,"Bayes Classifier")
+plt.figure(8)
+PlotContours(xr,yr,z_bayes,"Bayes Classifier")
+
 
 
 plt.show()
