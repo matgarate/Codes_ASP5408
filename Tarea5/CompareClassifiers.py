@@ -60,6 +60,17 @@ PlotContours(xr,yr,z_qda,"Quadratic Discriminant Analysis")
 
 #Methods Parte b)
 
+z_k1=KNeigh(x,y,z,xr,yr,1)
+z_k15=KNeigh(x,y,z,xr,yr,15)
+
+plt.figure(5)
+PlotContours(xr,yr,z_k1,"1 Nearest Neighbohr")
+
+plt.figure(6)
+PlotContours(xr,yr,z_k15,"15 Nearest Neighbohr")
+
+
+
 
 #Methods Parte c)
 
