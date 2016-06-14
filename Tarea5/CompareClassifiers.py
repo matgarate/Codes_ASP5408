@@ -76,11 +76,14 @@ PlotContours(xr,yr,z_qda,"Quadratic Discriminant Analysis")
 z_k1=KNeigh(x,y,z,xr,yr,1)
 z_k15=KNeigh(x,y,z,xr,yr,15)
 
-z_lasso=LassoQuadratic(x,y,z,xr,yr)
+z_svc=SVC(x,y,z,xr,yr)
+#z_lasso=LassoQuadratic(x,y,z,xr,yr)
+
 
 Confussion_Score(z,KNeigh(x,y,z,x,y,1) ,"NN-1")
 Confussion_Score(z,KNeigh(x,y,z,x,y,15) ,"NN-15")
-Confussion_Score(z,LassoQuadratic(x,y,z,x,y) ,"Quadratic Lasso")
+#Confussion_Score(z,LassoQuadratic(x,y,z,x,y) ,"Quadratic Lasso")
+Confussion_Score(z,SVC(x,y,z,x,y) ,"SVC")
 
 
 plt.figure(5)
@@ -90,7 +93,8 @@ plt.figure(6)
 PlotContours(xr,yr,z_k15,"15 Nearest Neighbohr")
 
 plt.figure(7)
-PlotContours(xr,yr,z_lasso,"Quadratic Lasso")
+#PlotContours(xr,yr,z_lasso,"Quadratic Lasso")
+PlotContours(xr,yr,z_svc,"SVC")
 
 
 #Methods Parte c)

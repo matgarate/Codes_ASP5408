@@ -4,6 +4,8 @@ import sklearn
 from sklearn import linear_model
 from sklearn.neighbors import KNeighborsClassifier
 
+from sklearn import svm
+
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 
@@ -20,26 +22,36 @@ def KNeigh(x,y,z,xr,yr,k_neigh):
 	return neigh.predict(Test)
 
 
+def SVC(x,y,z,xr,yr):
+	In=np.array([x,y]).T
+	clf = svm.SVC(kernel='poly',degree=2)
+	clf.fit(In,z)
+	
+	Test=np.array([xr,yr]).T
+	return clf.predict(Test)
+
 
 def LassoQuadratic(x,y,z,xr,yr):
 	M=CoeffMatrix(x,y,2)
 	beta=linalg.lstsq(M,z)[0]
-	'''	
+	
+
 	b0=np.average(z)
 	t=np.average(np.fabs(beta[np.arange(1,beta.size)]))
 	In=np.array([x,y,np.square(x),np.square(y),np.multiply(x,y)]).T
-	clf = linear_model.Lasso(alpha=t)
+	clf = linear_model.Lasso(alpha=0.5)
 	clf.fit(In, z-b0)
 	beta_lasso=[b0]
 	for f in clf.coef_:
 		beta_lasso.append(f)
-	'''
+	
 
+	'''
 	t=np.average(beta)
 	clf = linear_model.Lasso(alpha=t)
 	clf.fit(M, z)
 	beta_lasso=clf.coef_
-	
+	'''
 
 	return np.dot(CoeffMatrix(xr,yr,2),beta_lasso)
 
