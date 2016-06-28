@@ -8,6 +8,7 @@ from sklearn.cross_validation import KFold
 import batman
 import george
 import emcee
+import corner
 
 ######################################################
 #
@@ -15,7 +16,7 @@ import emcee
 #
 ######################################################
 
-NCOMP=6
+NCOMP=5
 NSAMP=9
 NFEAT=100
 
@@ -165,6 +166,7 @@ def MCMC(nwalkers,iter_fac,num_signals, t, y, index):
 
 Walkers=42
 Iter=1
+
 '''
 kf = KFold(time.size, n_folds=4)
 MSE=[]
@@ -173,7 +175,7 @@ for nsignal in range(NCOMP+1):
 	MSE.append(0.0)
 	for train_index, test_index in kf:
 		samples_train=MCMC(Walkers,Iter,nsignal,time,flux_target,train_index)
-		sigma,base_flux, transit_par, signal_par=ReturnParams(samples_train[-1])
+		sigma,base_flux, transit_par, signal_par=ReturnParams(np.average(samples_train,axis=0) )
 
 		test_model=model1(base_flux,transit_par,signal_par, time)
 		MSE[nsignal]= MSE[nsignal]+ np.sum(np.square(test_model-flux_target)[test_index])
@@ -181,10 +183,14 @@ print MSE
 opt_nsignal= np.argmin(MSE)
 print opt_nsignal
 '''
-
 opt_nsignal=3
 samples= MCMC(Walkers,Iter,opt_nsignal,time,flux_target,np.arange(NFEAT))
-print samples[-1]
+
+MCMC_estimator=np.average(samples,axis=0)
+print MCMC_estimator
+MCMC_std=np.std(samples,axis=0)
+print MCMC_std
+
 
 ######################################################
 #
@@ -224,8 +230,13 @@ for s in samples[np.random.randint(len(samples), size=64)]:
 	sigma,base_flux, transit_par, signal_par=ReturnParams(s)
     	plt.plot(time, model1(base_flux,transit_par,signal_par, time), color="#4682b4", alpha=0.3)
 
-sigma,base_flux, transit_par, signal_par=ReturnParams(samples[-1])
+sigma,base_flux, transit_par, signal_par=ReturnParams(MCMC_estimator)
 plt.plot(time,flux_target,'k-')
 plt.plot(time,model1(base_flux,transit_par,signal_par, time),'r-')
+
+plt.figure(5)
+corner.corner(samples, labels=["sigma", "c", "rp","a","inc","a1","a2","a3"],truths=MCMC_estimator)
+
+
 
 plt.show()
