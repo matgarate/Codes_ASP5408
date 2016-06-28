@@ -15,7 +15,7 @@ import emcee
 #
 ######################################################
 
-NCOMP=5
+NCOMP=6
 NSAMP=9
 NFEAT=100
 
@@ -51,6 +51,9 @@ flux_target=flux_target-flux_average
 pca = PCA(n_components=NCOMP)
 flux_param= pca.fit_transform(flux_comp)
 signals=pca.components_
+variance_ratio=pca.explained_variance_ratio_
+
+print variance_ratio
 
 flux_fit=[]
 for i in range(NSAMP):
@@ -88,7 +91,7 @@ def model_transit(params, t):
     	return bat_flux
 
 def model_signal(params, t):
-	signal_sum=np.zeros(NFEAT)
+	signal_sum=np.zeros(t.size)
 	for i in range(params.size):
 		signal_sum=signals[i]*params[i]
     	return signal_sum
@@ -109,9 +112,9 @@ def ReturnParams(p):
 	signal_par=np.array(p[5:p.size])
 	return sigma,base_flux,transit_par,signal_par
 
-def lnlike1(sig,base_flux, transit_par, signal_par, t, y):
+def lnlike1(sig,base_flux, transit_par, signal_par, t, y,index):
 	m=model1(base_flux,transit_par,signal_par,t)
-	return -0.5 * np.sum(((y - m)/sig) ** 2)
+	return -0.5 * np.sum(((y[index] - m[index])/sig) ** 2)
 
 def lnprior1(sig,base_flux, transit_par, signal_par):
 	rp,a,inc= transit_par
@@ -123,11 +126,11 @@ def lnprior1(sig,base_flux, transit_par, signal_par):
        		return 0.0
     	return -np.inf
 
-def lnprob1(p, t, y):
+def lnprob1(p, t, y,index):
 	#p[0]=0.0001	#Fixing sigma to the known value
 	sigma,base_flux,transit_par,signal_par=ReturnParams(p)
     	lp = lnprior1(sigma,base_flux,transit_par,signal_par)
-    	return lp + lnlike1(sigma,base_flux,transit_par,signal_par, t, y) if np.isfinite(lp) else -np.inf
+    	return lp + lnlike1(sigma,base_flux,transit_par,signal_par, t, y,index) if np.isfinite(lp) else -np.inf
 
 ######################################################
 #
@@ -135,36 +138,81 @@ def lnprob1(p, t, y):
 #
 ######################################################
 
-nwalkers=56
+def MCMC(nwalkers,num_sigpar, time,flux,index):
+	data=[time,flux,index]
+	#data=[time,flux]
+
+	#sigma, floor_flux, rp,a,i, signal_params
+	initial=[0.0001,0, 0.1, 8.0, 85.0]
+	delta_steps=[1e-5,1e-4,1e-3,1e-3,1e-2]
+	for i in range(num_sigpar):
+		initial.append(0.0)
+		delta_steps.append(1e-2)
+
+	initial=np.array(initial)
+	delta_steps=np.array(delta_steps)
+	ndim = len(initial)
+
+	p0 = [np.array(initial) + np.multiply(delta_steps, np.random.randn(ndim))
+	      for i in xrange(nwalkers)]
+	sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data)
+	
+	p0, _, _ = sampler.run_mcmc(p0, 500)
+	sampler.reset()
+	sampler.run_mcmc(p0, 1000)
+	samples = sampler.flatchain
+	return samples
+samples= MCMC(42,5,time,flux_target,np.arange(NFEAT))
+
+
+'''
+nwalkers=42
+
 data=[time,flux_target]
 
-fold=5
 
-num_sigpar=5
+fold=5
 kf = KFold(time.size, n_folds=fold)
 MSE=[]
 
-#sigma, floor_flux, rp,a,i, signal_params
-initial=[0.0001,0, 0.1, 8.0, 85.0]
-delta_steps=[1e-5,1e-4,1e-3,1e-3,1e-2]
-for i in range(num_sigpar):
-	initial.append(0.0)
-	delta_steps.append(1e-2)
+for num_sigpar in range(2,3):
 
-initial=np.array(initial)
-delta_steps=np.array(delta_steps)
-ndim = len(initial)
+	MSE.append(0.0)
+	for train_index, test_index in kf:
+		data_train=[time[train_index],flux_target[train_index]]
+		data_test=[time[test_index],flux_target[test_index]]
 
-p0 = [np.array(initial) + np.multiply(delta_steps, np.random.randn(ndim))
-      for i in xrange(nwalkers)]
+		
+		#sigma, floor_flux, rp,a,i, signal_params
+		initial=[0.0001,0, 0.1, 8.0, 85.0]
+		delta_steps=[1e-5,1e-4,1e-3,1e-3,1e-2]
+		for i in range(num_sigpar):
+			initial.append(0.0)
+			delta_steps.append(1e-2)
 
-sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data)
-p0, _, _ = sampler.run_mcmc(p0, 500)
-sampler.reset()
-sampler.run_mcmc(p0, 2000)
-samples = sampler.flatchain
-print samples[-1]
+		initial=np.array(initial)
+		delta_steps=np.array(delta_steps)
+		ndim = len(initial)
 
+		p0 = [np.array(initial) + np.multiply(delta_steps, np.random.randn(ndim))
+		      for i in xrange(nwalkers)]
+
+
+		sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data_train)
+		
+		p0, _, _ = sampler.run_mcmc(p0, 500)
+		
+		sampler.reset()
+		sampler.run_mcmc(p0, 1000)
+		samples = sampler.flatchain
+
+		#sigma,base_flux, transit_par, signal_par=ReturnParams(samples[-1])
+		#test_model=model1(base_flux,transit_par,signal_par, data_test[0])
+		#MSE[num_sigpar]= MSE[num_sigpar]+ np.sum( np.square(test_model-data_test[1]))
+print MSE
+'''
+
+	#print samples[-1]
 
 ######################################################
 #
@@ -186,11 +234,10 @@ plt.plot(time,flux_target)
 
 plt.figure(2)
 plt.title('Principal Components')
-plt.xlabel("Time")
-plt.ylabel("Relative Flux (Logscale)")
 for i in range(NCOMP):
+	plt.subplot("32"+str(i))
 	plt.plot(time,signals[i], label='VarExp: '+str(pca.explained_variance_ratio_[i]))
-plt.legend()
+#plt.legend()
 
 plt.figure(3)
 plt.title('Samples(Red) - PCA Fit (Blue)')
