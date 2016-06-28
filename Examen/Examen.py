@@ -49,8 +49,8 @@ flux_target=flux_target-flux_average
 
 
 #Based on http://dan.iel.fm/george/current/user/model/
-def model1(params, t):
-	c,rp,a,i, p1,p2,p3= params
+def model_transit(params, t):
+	rp,a,i =params
 
 	#based on http://astro.uchicago.edu/~kreidberg/batman/quickstart.html
 
@@ -68,28 +68,50 @@ def model1(params, t):
 	m = batman.TransitModel(params, t)    
 	bat_flux = np.log(m.light_curve(params))
 
+    	return bat_flux
+
+def model_signal(params, t):
+	p1,p2,p3= params
 	signal_sum=np.zeros(NFEAT)
 	signal_par=[p1,p2,p3]
 	for i in range(NCOMP):
 		signal_sum=signals[i]*signal_par[i]
-    	return c + signal_sum + bat_flux
-def lnlike1(p, t, y, yerr):
-    return -0.5 * np.sum(((y - model1(p, t))/yerr) ** 2)
-def lnprior1(p):
-    c,rp,a,i, p1,p2,p3 = p
-    if (-0.01 < c < 0.01 and  0.01 < rp < 0.5 and 0.01 < a < 15 and 50 < i < 90 and -2 < p1 < 2 and -2 < p2 < 2 and -2 < p3 < 2):
-        return 0.0
-    return -np.inf
-def lnprob1(p, t, y, yerr):
-    lp = lnprior1(p)
-    return lp + lnlike1(p, t, y, yerr) if np.isfinite(lp) else -np.inf
+    	return signal_sum
+def model1(p,t):
+	sigma=p[0]
+	base_flux=p[1]
+	params_transit=np.array([p[2],p[3],p[4]])
+	params_signal=np.array([p[5],p[6],p[7]])
+	return base_flux + model_signal(params_signal,t)+ model_transit(params_transit, t)
 
+
+def lnlike1(p, t, y):
+	sig=p[0]
+	return -0.5 * np.sum(((y - model1(p, t))/sig) ** 2)
+
+def lnprior1(p):
+    	sig, c,rp,a,i, p1,p2,p3 = p
+    	if (0.00005<sig<0.01 and -0.01 < c < 0.01 and  0.01 < rp < 0.5 and 0.01 < a < 15 and 50 < i < 90 and -2 < p1 < 2 and -2 < p2 < 2 and -2 < p3 < 2):
+        	return 0.0
+    	return -np.inf
+
+def lnprob1(p, t, y):
+	p[0]=0.0001	#Fixing sigma to the known value
+    	lp = lnprior1(p)
+    	return lp + lnlike1(p, t, y) if np.isfinite(lp) else -np.inf
+
+#Send sigma to the free parameters for the likelihood.
+#Send the PCA number and write in function of that.
 
 nwalkers=42
-data=[time,flux_target,0.0001]
-initial = np.array([0, 0.1, 8.0, 87.0, 0.0,0.0,0.0])
+data=[time,flux_target]
+initial = np.array([0.0001,0, 0.1, 8.0, 87.0, 0.0,0.0,0.0])
+
+
+
+
 ndim = len(initial)
-p0 = [np.array(initial) + 1e-3 * np.random.randn(ndim)
+p0 = [np.array(initial) + 1e-4 * np.random.randn(ndim)
       for i in xrange(nwalkers)]
 sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data)
 
@@ -98,7 +120,8 @@ p0, _, _ = sampler.run_mcmc(p0, 500)
 sampler.reset()
 print("Running production...")
 sampler.run_mcmc(p0, 1000)
-
+samples = sampler.flatchain
+print samples[-1]
 
 #GRAFICOS PCA
 plt.figure(0)
@@ -131,7 +154,6 @@ for i in range(NSAMP):
 
 
 plt.figure(4)
-samples = sampler.flatchain
 for s in samples[np.random.randint(len(samples), size=64)]:
     plt.plot(time, model1(s, time), color="#4682b4", alpha=0.3)
 
