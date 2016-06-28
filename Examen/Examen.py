@@ -9,12 +9,22 @@ import batman
 import george
 import emcee
 
+######################################################
+#
+#	GLOBALS
+#
+######################################################
 
-
-NCOMP=3
+NCOMP=5
 NSAMP=9
 NFEAT=100
 
+
+######################################################
+#
+#	READ AND PREPARE DATA
+#
+######################################################
 time, flux_target= np.loadtxt("dataset_7.dat",usecols=(0,1),unpack=True,skiprows=1)
 flux_comp= np.loadtxt("dataset_7.dat",usecols=(2,3,4,5,6,7,8,9,10),unpack=True,skiprows=1)
 
@@ -23,6 +33,18 @@ time= time/24.0
 flux_target=np.log(flux_target)
 flux_comp=np.log(flux_comp)
 
+#SUBSTRACT MEAN FLUX
+flux_average=np.average(flux_comp,axis=0)
+for i in range(NSAMP):
+	flux_comp[i]=flux_comp[i]-flux_average
+flux_target=flux_target-flux_average
+
+
+######################################################
+#
+#	PRINCIPAL COMPONENT ANALYSIS
+#
+######################################################
 
 
 #OBTAIN AND FIT PCA COMPONENTS TO TRAINING SAMPLES
@@ -37,29 +59,25 @@ for i in range(NSAMP):
 		a=a+ signals[j]*flux_param[i][j]
 	flux_fit.append(a)
 
-#SUBSTRACT MEAN FLUX
-flux_average=np.average(flux_comp,axis=0)
-for i in range(NSAMP):
-	flux_comp[i]=flux_comp[i]-flux_average
-flux_target=flux_target-flux_average
+
+#Models, Probabilities and MCMC based on http://dan.iel.fm/george/current/user/model/
+######################################################
+#
+#	MODELS: TRANSIT + SIGNAL + BASE
+#
+######################################################
 
 
-
-
-
-
-#Based on http://dan.iel.fm/george/current/user/model/
 def model_transit(params, t):
-	rp,a,i =params
+	rp,a,inc =params
 
-	#based on http://astro.uchicago.edu/~kreidberg/batman/quickstart.html
-
+	#From http://astro.uchicago.edu/~kreidberg/batman/quickstart.html
 	params = batman.TransitParams()
 	params.t0 = 0.                       #time of inferior conjunction
 	params.per = 0.78884                 #orbital period
 	params.rp = rp 	                     #planet radius (in units of stellar radii)
 	params.a = a 	                     #semi-major axis (in units of stellar radii)
-	params.inc = i 	                     #orbital inclination (in degrees)
+	params.inc = inc 	             #orbital inclination (in degrees)
 	params.ecc = 0.                      #eccentricity
 	params.w = 90.                       #longitude of periastron (in degrees)
 	params.u = [0.1, 0.3]                #limb darkening coefficients
@@ -67,75 +85,104 @@ def model_transit(params, t):
 
 	m = batman.TransitModel(params, t)    
 	bat_flux = np.log(m.light_curve(params))
-
     	return bat_flux
 
 def model_signal(params, t):
-	p1,p2,p3= params
 	signal_sum=np.zeros(NFEAT)
-	signal_par=[p1,p2,p3]
-	for i in range(NCOMP):
-		signal_sum=signals[i]*signal_par[i]
+	for i in range(params.size):
+		signal_sum=signals[i]*params[i]
     	return signal_sum
-def model1(p,t):
+
+def model1(base_flux, transit_par, signal_par,t):
+	return base_flux + model_signal(signal_par,t)+ model_transit(transit_par, t)
+
+######################################################
+#
+#	PRIOR - LIKELIHOOD - POSTERIOR
+#
+######################################################
+
+def ReturnParams(p):
 	sigma=p[0]
 	base_flux=p[1]
-	params_transit=np.array([p[2],p[3],p[4]])
-	params_signal=np.array([p[5],p[6],p[7]])
-	return base_flux + model_signal(params_signal,t)+ model_transit(params_transit, t)
+	transit_par=np.array([p[2],p[3],p[4]])
+	signal_par=np.array(p[5:p.size])
+	return sigma,base_flux,transit_par,signal_par
 
+def lnlike1(sig,base_flux, transit_par, signal_par, t, y):
+	m=model1(base_flux,transit_par,signal_par,t)
+	return -0.5 * np.sum(((y - m)/sig) ** 2)
 
-def lnlike1(p, t, y):
-	sig=p[0]
-	return -0.5 * np.sum(((y - model1(p, t))/sig) ** 2)
-
-def lnprior1(p):
-    	sig, c,rp,a,i, p1,p2,p3 = p
-    	if (0.00005<sig<0.01 and -0.01 < c < 0.01 and  0.01 < rp < 0.5 and 0.01 < a < 15 and 50 < i < 90 and -2 < p1 < 2 and -2 < p2 < 2 and -2 < p3 < 2):
-        	return 0.0
+def lnprior1(sig,base_flux, transit_par, signal_par):
+	rp,a,inc= transit_par
+	signal_inrange=True
+	for i in range(signal_par.size):
+		if(signal_par[i]<-20.0 or signal_par[i]>20.0):
+			signal_inrange=False
+    	if (0.00005<sig<0.002 and -0.01 < base_flux < 0.01 and  0.01 < rp < 0.5 and 0.01 < a < 15 and 50 < inc < 90 and signal_inrange):
+       		return 0.0
     	return -np.inf
 
 def lnprob1(p, t, y):
-	p[0]=0.0001	#Fixing sigma to the known value
-    	lp = lnprior1(p)
-    	return lp + lnlike1(p, t, y) if np.isfinite(lp) else -np.inf
+	#p[0]=0.0001	#Fixing sigma to the known value
+	sigma,base_flux,transit_par,signal_par=ReturnParams(p)
+    	lp = lnprior1(sigma,base_flux,transit_par,signal_par)
+    	return lp + lnlike1(sigma,base_flux,transit_par,signal_par, t, y) if np.isfinite(lp) else -np.inf
 
-#Send sigma to the free parameters for the likelihood.
-#Send the PCA number and write in function of that.
+######################################################
+#
+#	MONTECARLO MARKOV CHAIN
+#
+######################################################
 
-nwalkers=42
+nwalkers=56
 data=[time,flux_target]
-initial = np.array([0.0001,0, 0.1, 8.0, 87.0, 0.0,0.0,0.0])
 
+fold=5
 
+num_sigpar=5
+kf = KFold(time.size, n_folds=fold)
+MSE=[]
 
+#sigma, floor_flux, rp,a,i, signal_params
+initial=[0.0001,0, 0.1, 8.0, 85.0]
+delta_steps=[1e-5,1e-4,1e-3,1e-3,1e-2]
+for i in range(num_sigpar):
+	initial.append(0.0)
+	delta_steps.append(1e-2)
 
+initial=np.array(initial)
+delta_steps=np.array(delta_steps)
 ndim = len(initial)
-p0 = [np.array(initial) + 1e-4 * np.random.randn(ndim)
-      for i in xrange(nwalkers)]
-sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data)
 
-print("Running burn-in...")
+p0 = [np.array(initial) + np.multiply(delta_steps, np.random.randn(ndim))
+      for i in xrange(nwalkers)]
+
+sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data)
 p0, _, _ = sampler.run_mcmc(p0, 500)
 sampler.reset()
-print("Running production...")
-sampler.run_mcmc(p0, 1000)
+sampler.run_mcmc(p0, 2000)
 samples = sampler.flatchain
 print samples[-1]
 
-#GRAFICOS PCA
+
+######################################################
+#
+#	PLOTS
+#
+######################################################
+
 plt.figure(0)
+plt.title("Average Samples Flux ")
+plt.xlabel("Time")
+plt.ylabel("Flux (Logscale)")
+plt.plot(time,flux_average)
+
+plt.figure(1)
 plt.title("Flux Target")
 plt.xlabel("Time")
 plt.ylabel("Relative Flux (Logscale)")
 plt.plot(time,flux_target)
-
-plt.figure(1)
-plt.title("Average Samples Flux ")
-plt.xlabel("Time")
-plt.ylabel("Relative Flux (Logscale)")
-plt.plot(time,flux_average)
-
 
 plt.figure(2)
 plt.title('Principal Components')
@@ -146,7 +193,7 @@ for i in range(NCOMP):
 plt.legend()
 
 plt.figure(3)
-plt.title('Samples(Red) -PCA Fit (Blue)')
+plt.title('Samples(Red) - PCA Fit (Blue)')
 for i in range(NSAMP):
 	plt.subplot("33"+str(i))
 	plt.plot(time,flux_comp[i],'r-')
@@ -155,11 +202,11 @@ for i in range(NSAMP):
 
 plt.figure(4)
 for s in samples[np.random.randint(len(samples), size=64)]:
-    plt.plot(time, model1(s, time), color="#4682b4", alpha=0.3)
+	sigma,base_flux, transit_par, signal_par=ReturnParams(s)
+    	plt.plot(time, model1(base_flux,transit_par,signal_par, time), color="#4682b4", alpha=0.3)
 
+sigma,base_flux, transit_par, signal_par=ReturnParams(samples[-1])
 plt.plot(time,flux_target,'k-')
-plt.plot(time,model1(samples[-1], time),'r-')
-
-
+plt.plot(time,model1(base_flux,transit_par,signal_par, time),'r-')
 
 plt.show()
