@@ -120,9 +120,9 @@ def lnprior1(sig,base_flux, transit_par, signal_par):
 	rp,a,inc= transit_par
 	signal_inrange=True
 	for i in range(signal_par.size):
-		if(signal_par[i]<-20.0 or signal_par[i]>20.0):
+		if(signal_par[i]<-30.0 or signal_par[i]>30.0):
 			signal_inrange=False
-    	if (0.00005<sig<0.002 and -0.01 < base_flux < 0.01 and  0.01 < rp < 0.5 and 0.01 < a < 15 and 50 < inc < 90 and signal_inrange):
+    	if (0.00005<sig<0.001 and -0.01 < base_flux < 0.01 and  0.01 < rp < 0.5 and 0.01 < a < 15 and 50 < inc < 90 and signal_inrange):
        		return 0.0
     	return -np.inf
 
@@ -138,16 +138,16 @@ def lnprob1(p, t, y,index):
 #
 ######################################################
 
-def MCMC(nwalkers,num_sigpar, time,flux,index):
-	data=[time,flux,index]
+def MCMC(nwalkers,iter_fac,num_signals, t, y, index):
+	data=[t,y,index]
 	#data=[time,flux]
 
 	#sigma, floor_flux, rp,a,i, signal_params
 	initial=[0.0001,0, 0.1, 8.0, 85.0]
 	delta_steps=[1e-5,1e-4,1e-3,1e-3,1e-2]
-	for i in range(num_sigpar):
+	for i in range(num_signals):
 		initial.append(0.0)
-		delta_steps.append(1e-2)
+		delta_steps.append(1e-3)
 
 	initial=np.array(initial)
 	delta_steps=np.array(delta_steps)
@@ -157,62 +157,34 @@ def MCMC(nwalkers,num_sigpar, time,flux,index):
 	      for i in xrange(nwalkers)]
 	sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data)
 	
-	p0, _, _ = sampler.run_mcmc(p0, 500)
+	p0, _, _ = sampler.run_mcmc(p0, 500*iter_fac)
 	sampler.reset()
-	sampler.run_mcmc(p0, 1000)
+	sampler.run_mcmc(p0, 1500*iter_fac)
 	samples = sampler.flatchain
 	return samples
-samples= MCMC(42,5,time,flux_target,np.arange(NFEAT))
 
-
+Walkers=42
+Iter=1
 '''
-nwalkers=42
-
-data=[time,flux_target]
-
-
-fold=5
-kf = KFold(time.size, n_folds=fold)
+kf = KFold(time.size, n_folds=4)
 MSE=[]
-
-for num_sigpar in range(2,3):
-
+for nsignal in range(NCOMP+1):
+	print nsignal
 	MSE.append(0.0)
 	for train_index, test_index in kf:
-		data_train=[time[train_index],flux_target[train_index]]
-		data_test=[time[test_index],flux_target[test_index]]
+		samples_train=MCMC(Walkers,Iter,nsignal,time,flux_target,train_index)
+		sigma,base_flux, transit_par, signal_par=ReturnParams(samples_train[-1])
 
-		
-		#sigma, floor_flux, rp,a,i, signal_params
-		initial=[0.0001,0, 0.1, 8.0, 85.0]
-		delta_steps=[1e-5,1e-4,1e-3,1e-3,1e-2]
-		for i in range(num_sigpar):
-			initial.append(0.0)
-			delta_steps.append(1e-2)
-
-		initial=np.array(initial)
-		delta_steps=np.array(delta_steps)
-		ndim = len(initial)
-
-		p0 = [np.array(initial) + np.multiply(delta_steps, np.random.randn(ndim))
-		      for i in xrange(nwalkers)]
-
-
-		sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob1, args=data_train)
-		
-		p0, _, _ = sampler.run_mcmc(p0, 500)
-		
-		sampler.reset()
-		sampler.run_mcmc(p0, 1000)
-		samples = sampler.flatchain
-
-		#sigma,base_flux, transit_par, signal_par=ReturnParams(samples[-1])
-		#test_model=model1(base_flux,transit_par,signal_par, data_test[0])
-		#MSE[num_sigpar]= MSE[num_sigpar]+ np.sum( np.square(test_model-data_test[1]))
+		test_model=model1(base_flux,transit_par,signal_par, time)
+		MSE[nsignal]= MSE[nsignal]+ np.sum(np.square(test_model-flux_target)[test_index])
 print MSE
+opt_nsignal= np.argmin(MSE)
+print opt_nsignal
 '''
 
-	#print samples[-1]
+opt_nsignal=3
+samples= MCMC(Walkers,Iter,opt_nsignal,time,flux_target,np.arange(NFEAT))
+print samples[-1]
 
 ######################################################
 #
