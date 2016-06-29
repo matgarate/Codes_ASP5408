@@ -96,7 +96,7 @@ def model_transit(params, t):
 def model_signal(params, t):
 	signal_sum=np.zeros(t.size)
 	for i in range(params.size):
-		signal_sum=signals[i]*params[i]
+		signal_sum= signal_sum+signals[i]*params[i]
     	return signal_sum
 
 def model1(base_flux, transit_par, signal_par,t):
@@ -170,7 +170,7 @@ Walkers=42
 Iter=1
 sigma=0.0001
 
-DoKFold=False
+DoKFold=True
 opt_nsignal=3
 if DoKFold:
 	kf = KFold(time.size, n_folds=4)
