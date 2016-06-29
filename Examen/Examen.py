@@ -213,11 +213,15 @@ def MCMC(t, y, sigma, index,nwalkers,iter_fac,num_signals):
 	samples = sampler.flatchain
 	return samples
 
+
+
+
+
 Walkers=42
 Iter=1
 sigma=0.0001
 
-DoKFold=False
+DoKFold=True
 opt_nsignal=3
 if DoKFold:
 	print "\nK-FOLD CROSS VALIDATION\n"
