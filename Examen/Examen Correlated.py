@@ -155,7 +155,11 @@ def ReturnParams2(p):
 def lnlike2(base_flux, transit_par, signal_par, GP_par,  t, y,yerr,index):
 	m=model1(base_flux,transit_par,signal_par,t)
 	amp,tau=GP_par
-    	gp = george.GP(a * kernels.Matern32Kernel(tau))
+	
+	#amp,tau=1.0,1.0
+
+    	gp = george.GP(amp * kernels.Matern32Kernel(tau))
+
 	gp.compute(t, yerr)
     	return gp.lnlikelihood(y - m)
 	
@@ -167,7 +171,7 @@ def lnprior2(base_flux, transit_par, signal_par,GP_par):
 		if(signal_par[i]<-0.1 or signal_par[i]>0.1):
 			signal_inrange=False
 
-    	if (-0.01 < base_flux < 0.01 and  0.01 < rp < 0.5 and 1.0 < a < 30.0 and 50 < inc < 90 and signal_inrange and -10.0<amp<10.0 and -10.0<tau<10.0):
+    	if (0.0 < base_flux < 0.01 and  0.1 < rp < 0.25 and 1.0 < a < 3.0 and 70 < inc < 80 and signal_inrange and 0.01<amp<1.0 and 0.01<tau<1.0):
        		return 0.0
 
     	return -np.inf
@@ -177,6 +181,8 @@ def lnprob2(p, t, y,yerr,index):
 	
 	base_flux,transit_par,gp_par,signal_par=ReturnParams2(p)
     	lp = lnprior2(base_flux,transit_par,signal_par,gp_par)
+	
+
     	return lp + lnlike2(base_flux,transit_par,signal_par,gp_par, t, y,yerr,index) if np.isfinite(lp) else -np.inf
 
 
@@ -188,7 +194,7 @@ def lnprob2(p, t, y,yerr,index):
 #
 ######################################################
 
-def MCMC(t, y, sigma, index,nwalkers,iter_fac,num_signals):
+def MCMC(t, y, sigma, index,nwalkers=42,iter_fac=1,num_signals=1):
 	data=[t,y,sigma,index]
 	#data=[time,flux]
 
@@ -213,15 +219,44 @@ def MCMC(t, y, sigma, index,nwalkers,iter_fac,num_signals):
 	samples = sampler.flatchain
 	return samples
 
+def MCMC2(t, y, yerr, index,nwalkers=42,iter_fac=1,num_signals=1):
+	data=[t,y,yerr,index]
+	#data=[time,flux]
+
+	#floor_flux, rp,a,i, signal_params
+	initial=[ 1.20180187e-03,   1.44553999e-01 ,  2.72196517e+00 ,  7.47870957e+01,0.2,0.2]
+	delta_steps=[1e-4,1e-3,1e-1,1e-2,1e-1,1e-1]
+	for i in range(num_signals):
+		initial.append(0.0)
+		delta_steps.append(1e-2)
+
+	initial=np.array(initial)
+	delta_steps=np.array(delta_steps)
+	ndim = len(initial)
+
+	p0 = [np.array(initial) + np.multiply(delta_steps, np.random.randn(ndim))
+	      for i in xrange(nwalkers)]
+	sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob2, args=data)
+	
+	p0, _, _ = sampler.run_mcmc(p0, 500*iter_fac)
+	sampler.reset()
+
+
+	p0, _, _ = sampler.run_mcmc(p0, 500*iter_fac)
+	sampler.reset()
+
+
+	sampler.run_mcmc(p0, 1500*iter_fac)
+	samples = sampler.flatchain
+	return samples
 
 
 
 
-Walkers=42
-Iter=1
+Walkers=32
 sigma=0.0001
 
-DoKFold=True
+DoKFold=False
 opt_nsignal=3
 if DoKFold:
 	print "\nK-FOLD CROSS VALIDATION\n"
@@ -229,10 +264,10 @@ if DoKFold:
 	kf = KFold(time.size, n_folds=4)
 	MSE=[]
 	for nsignal in range(NCOMP+1):
-		print nsignal
+		print "Testing "+str(nsignal)+" signals"
 		MSE.append(0.0)
 		for train_index, test_index in kf:
-			samples_train=MCMC(time,flux_target,sigma,train_index,Walkers,Iter,nsignal)
+			samples_train=MCMC(time,flux_target,sigma,train_index,nwalkers=Walkers,iter_fac=1,num_signals=nsignal)
 			base_flux, transit_par, signal_par=ReturnParams(np.average(samples_train,axis=0) )
 
 			test_model=model1(base_flux,transit_par,signal_par, time)
@@ -247,7 +282,7 @@ print "N signals used:" + str(opt_nsignal)
 
 print "\nWHITE NOISE MCMC\n"
 
-samples= MCMC(time,flux_target,sigma,np.arange(NFEAT),Walkers*2,Iter*2,opt_nsignal)
+samples= MCMC(time,flux_target,sigma,np.arange(NFEAT),nwalkers=Walkers,iter_fac=2,num_signals=opt_nsignal)
 SquareResiduals=[]
 for i in range(len(samples)):
 	c,trans,sigpar=ReturnParams(samples[i])
@@ -269,6 +304,26 @@ MCMC_model=model1(base_flux,transit_par,signal_par, time)
 #	MODELING NOISE
 #
 ######################################################
+
+print "\nCORRELATED NOISE MCMC\n"
+
+
+samples= MCMC2(time,flux_target,flux_target-MCMC_model,np.arange(NFEAT),nwalkers=42,iter_fac=3,num_signals=opt_nsignal)
+SquareResiduals=[]
+for i in range(len(samples)):
+	c,trans,gp,sigpar=ReturnParams2(samples[i])
+	SquareResiduals.append(np.sum(np.square(model1(c,trans,sigpar,time)-flux_target)))
+
+MCMC_estimator=samples[np.argmin(SquareResiduals)]
+MCMC_variance= np.min(SquareResiduals)/float(NFEAT-1)
+
+print "MCMC PARAM (c,rp,a,i,alpha_j):"
+print MCMC_estimator
+print "MCMC Residuals Variance:"
+print MCMC_variance
+
+base_flux, transit_par, gp_par,signal_par=ReturnParams2(MCMC_estimator)
+MCMC_model=model1(base_flux,transit_par,signal_par, time)
 
 
 #plt.plot(time,np.square(MCMC_model-flux_target),'ro')
@@ -369,11 +424,12 @@ plt.figure(4)
 plt.title("MCMC Estimation")
 plt.xlabel("Time (days)")
 plt.ylabel("Log Relative Flux")
-
+'''
 for s in samples[np.random.randint(len(samples), size=1000)]:
-	base_flux, transit_par, signal_par=ReturnParams(s)
+	#base_flux, transit_par, signal_par=ReturnParams(s)
+	base_flux, transit_par,gp_par signal_par=ReturnParams2(s)
     	plt.plot(time, model1(base_flux,transit_par,signal_par, time), color="#4682b4", alpha=0.3)
-
+'''
 plt.plot(time,flux_target,'k-',label='Star Flux')
 plt.plot(time,MCMC_model,'r-',label='Model Flux')
 plt.legend()
@@ -393,8 +449,10 @@ plt.subplot("212")
 plt.ylabel('CDF')
 plt.xlabel('Planet Radius (Rp/R*)')
 plt.plot(planet_bin,planet_cdf)
-corner.corner(samples, labels=["c", "rp","a","inc","a1","a2","a3"],truths=MCMC_estimator)
+#corner.corner(samples, labels=["c", "rp","a","inc","a1","a2","a3"],truths=MCMC_estimator)
+corner.corner(samples,labels=["c", "rp","a","inc","A","T","a1","a2","a3"], truths=MCMC_estimator)
 
 
 
 plt.show()
+
